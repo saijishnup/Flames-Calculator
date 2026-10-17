@@ -6,7 +6,7 @@
 
 For the names we scribbled in notebooks<br>and the crushes we never confessed.
 
-<a href="https://flames-calculator-swart.vercel.app"><img src="https://img.shields.io/badge/live-flames--calculator--swart.vercel.app-f0809a?style=flat-square&labelColor=2b1b22" alt="Live demo" /></a>
+<a href="https://flames-calculators.vercel.app"><img src="https://img.shields.io/badge/live-flames--calculators.vercel.app-f0809a?style=flat-square&labelColor=2b1b22" alt="Live demo" /></a>
 <a href="https://github.com/saijishnup/flames-calculator/blob/main/LICENSE"><img src="https://img.shields.io/github/license/saijishnup/flames-calculator?style=flat-square" alt="MIT License" /></a>
 <img src="https://img.shields.io/badge/single%20file-HTML-ffb3c6?style=flat-square&labelColor=2b1b22" alt="Single HTML file" />
 <img src="https://img.shields.io/badge/dependencies-0-d9ccff?style=flat-square&labelColor=2b1b22" alt="Zero dependencies" />
