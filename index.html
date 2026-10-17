@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FLAMES Calculator</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%27-0.5 -1 8 8%27 shape-rendering=%27crispEdges%27%3E%3Cpath fill=%27%23f0809a%27 d=%27M1 0h2v1H1zM4 0h2v1H4zM0 1h7v2H0zM1 3h5v1H1zM2 4h3v1H2zM3 5h1v1H3z%27/%3E%3C/svg%3E">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  /* Layout: single centred column of neo-brutalist pastel cards: form > working stage > result > footer. */
+  :root{
+    color-scheme:light;
+    --bg:#FFFDFC;
+    --surface:#ffffff;
+    --ink:#2b1b22;
+    --ink-soft:#6b5560;
+    --border:#2b1b22;
+    --pink:#ffb3c6;
+    --blush:#FCE7EF;
+    --rose:#f0809a;
+    --lilac:#EEE8FF;
+    --purple:#D9CCFF;
+    --mint:#c9e8d8;
+    --butter:#ffe9b8;
+    --blue:#E5F1FF;
+    --danger:#c0395a;
+    --danger-bg:#ffe8ee;
+    --shadow:6px 6px 0 var(--border);
+    --shadow-sm:4px 4px 0 var(--border);
+    --r:14px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  body{
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    background:var(--bg);
+    position:relative;z-index:0; /* own stacking context so the background canvas sits above the page colour */
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding-block:2rem 3.5rem;
+    padding-left:max(16px, env(safe-area-inset-left, 0px));
+    padding-right:max(16px, env(safe-area-inset-right, 0px));
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* Reactive pastel background (canvas, drawn by script). */
+  #fluid{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+
+  header{width:100%;max-width:660px;margin-bottom:1.75rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}
+  header > div{min-width:0}
+  .mute{flex-shrink:0;width:44px;padding:0;justify-content:center}
+  .mute[aria-pressed=true]{background:var(--lilac)}
+
+  h1{
+    font-size:clamp(2.4rem,8vw,3.6rem);
+    font-weight:700;letter-spacing:-.035em;line-height:1;
+    margin-bottom:.6rem;
+  }
+
+  h1 .accent{
+    color:var(--rose);
+    text-decoration:underline;
+    text-decoration-thickness:.12em;
+    text-underline-offset:.1em;
+  }
+
+  .subtitle{font-size:.95rem;color:var(--ink-soft);max-width:46ch}
+
+  .card{
+    width:100%;max-width:660px;
+    background:var(--surface);
+    border:2.5px solid var(--border);
+    border-radius:var(--r);
+    box-shadow:var(--shadow);
+    padding:1.75rem;
+  }
+
+  .field{display:flex;flex-direction:column;gap:.4rem;margin-bottom:1.1rem}
+
+  label{
+    font-size:.82rem;font-weight:600;letter-spacing:.02em;
+    display:flex;align-items:center;gap:.45rem;
+  }
+
+  .dot{width:12px;height:12px;border:2px solid var(--border);border-radius:50%;flex-shrink:0}
+  .dot.a{background:var(--pink)}
+  .dot.b{background:var(--lilac)}
+
+  input[type=text]{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:1rem;font-weight:500;color:var(--ink);
+    background:var(--blush);
+    border:2.5px solid var(--border);
+    border-radius:10px;
+    padding:.7rem .85rem;
+    outline:none;
+    transition:box-shadow .18s cubic-bezier(.16,1,.3,1), background .18s;
+    width:100%;
+  }
+  input[type=text]::placeholder{color:#b8a0aa;font-weight:400}
+  input[type=text]:focus{background:var(--surface);box-shadow:var(--shadow-sm)}
+  input[type=text].err{background:var(--danger-bg);border-color:var(--danger);animation:shake .32s ease}
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-4px)}
+    75%{transform:translateX(4px)}
+  }
+
+  .hint{font-size:.74rem;color:var(--ink-soft);font-family:'Space Mono',monospace}
+  .error-msg{font-size:.78rem;font-weight:600;color:var(--danger);display:none}
+  .error-msg.show{display:block}
+
+  .btn-row{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-top:1.4rem}
+
+  button,.btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:.95rem;font-weight:700;letter-spacing:.01em;
+    cursor:pointer;
+    border:2.5px solid var(--border);
+    border-radius:10px;
+    padding:.72rem 1.3rem;
+    background:var(--pink);
+    color:var(--ink);
+    box-shadow:var(--shadow-sm);
+    transition:transform .12s ease, box-shadow .12s ease, background .18s;
+    display:inline-flex;align-items:center;gap:.45rem;
+    white-space:nowrap;
+    min-height:44px;
+    text-decoration:none;
+    touch-action:manipulation;
+    -webkit-tap-highlight-color:transparent;
+  }
+  button:hover,.btn:hover{background:#ff9db5}
+  button:active,.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--border)}
+  button:focus-visible,.btn:focus-visible{outline:3px solid var(--rose);outline-offset:3px}
+  button.ghost,.btn.ghost{background:var(--blue)}
+  button.ghost:hover,.btn.ghost:hover{background:#d4e7ff}
+  button.sm,.btn.sm{font-size:.8rem;padding:.4rem .9rem;min-height:40px;box-shadow:3px 3px 0 var(--border)}
+
+  /* ---------- speed picker ---------- */
+  .speed{display:flex;align-items:center;gap:.6rem;margin-left:auto}
+  .speed-label{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+  .seg{display:inline-flex;border:2.5px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:3px 3px 0 var(--border)}
+  .seg label{position:relative;cursor:pointer}
+  .seg input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+  .seg span{display:flex;align-items:center;min-height:38px;padding:0 .9rem;font-size:.8rem;font-weight:700;background:var(--surface);transition:background .15s}
+  .seg label + label span{border-left:2px solid var(--border)}
+  .seg input:checked + span{background:var(--purple)}
+  .seg input:focus-visible + span{outline:3px solid var(--rose);outline-offset:-5px}
+
+  /* ---------- working animation ---------- */
+  .stage{display:none;margin-top:1.75rem;border:2.5px solid var(--border);border-radius:var(--r);background:var(--blue);box-shadow:var(--shadow-sm);padding:1.1rem}
+  .stage.show{display:block;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+
+  .stage-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem}
+  .stage-title{font-family:'Space Mono',monospace;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;min-width:0}
+
+  .rowlabel{font-family:'Space Mono',monospace;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.3rem;word-break:break-word}
+  .tiles{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.8rem}
+
+  .tile{
+    width:1.7rem;height:2rem;
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:'Space Mono',monospace;font-size:.85rem;font-weight:700;text-transform:uppercase;
+    background:var(--surface);
+    border:2px solid var(--border);border-radius:7px;
+    transition:transform .25s cubic-bezier(.34,1.56,.64,1), opacity .25s, background .2s;
+  }
+  .tile.a{background:var(--pink)}
+  .tile.b{background:var(--lilac)}
+  .tile.pair{background:var(--butter);transform:translateY(-4px) scale(1.08)}
+  .tile.left{background:var(--mint)}
+  .tile.gone{background:var(--surface);opacity:.3;transform:scale(.82);text-decoration:line-through}
+
+  .counter{display:flex;align-items:baseline;gap:.6rem;margin:.2rem 0 .8rem;font-family:'Space Mono',monospace;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);min-height:2.1rem}
+  .counter b{font-family:'Space Grotesk',sans-serif;font-size:1.7rem;line-height:1;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  /* ---------- result ---------- */
+  .result{margin-top:1.25rem;display:none}
+  .result.show{display:block;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes pop{
+    0%{opacity:0;transform:translateY(12px) scale(.96)}
+    100%{opacity:1;transform:translateY(0) scale(1)}
+  }
+
+  .result-inner{
+    position:relative;overflow:hidden;isolation:isolate;
+    border:2.5px solid var(--border);
+    border-radius:var(--r);
+    padding:1.5rem;
+    background:var(--blush);
+    box-shadow:var(--shadow-sm);
+  }
+
+  .result-label{
+    font-family:'Space Mono',monospace;
+    font-size:.68rem;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:.3rem;
+    word-break:break-word;
+  }
+
+  .result-letter{
+    font-size:clamp(3.5rem,14vw,5.5rem);
+    font-weight:700;line-height:1;letter-spacing:-.04em;margin-bottom:.25rem;
+  }
+
+  .result-title{font-size:1.35rem;font-weight:700;margin-bottom:.5rem}
+  .result-desc{font-size:.92rem;color:var(--ink-soft);max-width:48ch}
+
+  .result-chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.1rem}
+
+  .chip{
+    font-family:'Space Mono',monospace;
+    font-size:.7rem;font-weight:700;
+    background:var(--surface);
+    border:2px solid var(--border);
+    border-radius:100px;
+    padding:.28rem .7rem;
+    box-shadow:2px 2px 0 var(--border);
+  }
+
+  .legend{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem;padding-bottom:6px}
+
+  .legend-item{
+    background:var(--surface);
+    border:2.5px solid var(--border);
+    border-radius:11px;
+    padding:.6rem .25rem;
+    text-align:center;
+    box-shadow:3px 3px 0 var(--border);
+    transition:transform .15s cubic-bezier(.16,1,.3,1), box-shadow .15s, background .15s;
+  }
+  .legend-item.hit{background:var(--butter);transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--border)}
+  .legend-item.active{background:var(--purple);transform:translateY(-5px);box-shadow:5px 5px 0 var(--border)}
+  .legend-item.out{background:var(--lilac);opacity:.55;transform:scale(.94);box-shadow:2px 2px 0 var(--border)}
+  .legend-item.out .legend-letter{text-decoration:line-through}
+
+  .legend-letter{font-size:1.5rem;font-weight:700;line-height:1;margin-bottom:.15rem}
+  .legend-word{
+    font-family:'Space Mono',monospace;
+    font-size:.6rem;font-weight:700;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--ink-soft);
+  }
+
+  /* ---------- heart confetti (behind card content) ---------- */
+  .hearts{position:absolute;inset:0;z-index:-1;pointer-events:none}
+  .heart{position:absolute;top:-2.5rem;line-height:1;opacity:0;animation:fall var(--d) cubic-bezier(.35,.2,.55,1) var(--delay) forwards}
+  @keyframes fall{
+    0%{transform:translate(0,0) rotate(0);opacity:0}
+    12%,80%{opacity:var(--o)}
+    100%{transform:translate(var(--x),var(--h)) rotate(var(--r));opacity:0}
+  }
+
+  /* ---------- share ---------- */
+  .share-row{margin-top:1.25rem}
+  .share-panel{margin-top:1rem;padding-top:1rem;border-top:2px dashed var(--border);display:grid;gap:.9rem}
+  .share-panel[hidden]{display:none}
+  .share-panel img{width:100%;max-width:280px;height:auto;aspect-ratio:1080/1400;border:2.5px solid var(--border);border-radius:10px;background:var(--surface);-webkit-touch-callout:default;user-select:auto}
+  .share-actions{display:flex;flex-wrap:wrap;gap:.5rem}
+  .share-msg{font-family:'Space Mono',monospace;font-size:.74rem;color:var(--ink-soft);min-height:1.2em}
+
+  /* ---------- footer + policy dialogs ---------- */
+  footer{width:100%;max-width:660px;margin-top:2.5rem;display:flex;flex-direction:column;align-items:center;gap:1rem;text-align:center}
+  .legal{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem 1.25rem;font-size:.85rem}
+  .legal a{color:var(--ink);text-decoration:underline;text-decoration-thickness:1.5px;text-underline-offset:3px}
+  .legal a:hover{color:var(--rose)}
+  .legal a:focus-visible{outline:3px solid var(--rose);outline-offset:3px;border-radius:4px}
+  .social{display:flex;flex-wrap:wrap;justify-content:center;gap:.7rem}
+  .btn.tea{background:var(--butter)}
+  .btn.tea:hover{background:#ffdf99}
+
+  dialog{
+    width:min(560px, calc(100% - 32px));max-height:min(80vh, 640px);margin:auto;
+    border:2.5px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);
+    background:var(--surface);color:var(--ink);padding:0;
+  }
+  dialog::backdrop{background:rgba(43,27,34,.4)}
+  dialog[open]{animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+  .dlg-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;background:var(--blush);border-bottom:2.5px solid var(--border)}
+  .dlg-head h2{font-size:1.15rem}
+  .dlg-body{padding:1.25rem;display:grid;gap:.85rem;font-size:.9rem;color:var(--ink-soft)}
+  .dlg-body h3{font-size:.95rem;color:var(--ink);margin-top:.25rem}
+  .dlg-body ul{padding-left:1.1rem;display:grid;gap:.3rem}
+  .dlg-date{font-family:'Space Mono',monospace;font-size:.72rem}
+
+  @media (max-width:560px){
+    body{padding-block:1.5rem 3.5rem}
+    .card{padding:1.25rem}
+    .btn-row button{flex:1 1 100%;justify-content:center}
+    .speed{width:100%;justify-content:space-between;margin-top:.3rem}
+    .share-row button{width:100%;justify-content:center}
+    .share-actions>*{flex:1 1 calc(50% - .5rem);justify-content:center}
+    .share-panel img{max-width:100%}
+    .legend{grid-template-columns:repeat(3,1fr)}
+    .tile{width:1.5rem;height:1.8rem;font-size:.78rem}
+    .social .btn{flex:1 1 calc(50% - .7rem);justify-content:center}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation-duration:.01ms !important;
+      transition-duration:.01ms !important;
+    }
+  }
+</style>
+
+<canvas id="fluid" aria-hidden="true"></canvas>
+
+<header>
+  <div>
+    <h1>FLAMES <span class="accent">Calculator</span></h1>
+    <p class="subtitle">For the names we scribbled in notebooks<br>and the crushes we never confessed.</p>
+  </div>
+  <button type="button" class="ghost sm mute" id="mute-btn" aria-pressed="false" aria-label="Mute sounds" title="Mute sounds"><svg class="ic-on" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13"/></svg><svg class="ic-off" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg></button>
+</header>
+
+<main class="card">
+  <div>
+    <div class="field">
+      <label for="name1"><span class="dot a"></span>First Name</label>
+      <input type="text" id="name1" placeholder="e.g. Ananya" autocomplete="off" spellcheck="false" maxlength="60">
+      <span class="error-msg" id="err1" role="alert">Enter a name with at least one letter.</span>
+    </div>
+
+    <div class="field">
+      <label for="name2"><span class="dot b"></span>Second Name</label>
+      <input type="text" id="name2" placeholder="e.g. Rohan" autocomplete="off" spellcheck="false" maxlength="60">
+      <span class="error-msg" id="err2" role="alert">Enter a name with at least one letter.</span>
+    </div>
+
+    <p class="hint">Letters only. Spaces, punctuation and case are ignored.</p>
+
+    <div class="btn-row">
+      <button type="button" id="calc-btn">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+        </svg>
+        Calculate
+      </button>
+      <button type="button" class="ghost" id="clear-btn">Clear</button>
+      <div class="speed">
+      <span class="speed-label" id="speed-label">Speed</span>
+      <div class="seg" role="radiogroup" aria-labelledby="speed-label">
+        <label><input type="radio" name="speed" id="speed-slow" value="1.7"><span>Slow</span></label>
+        <label><input type="radio" name="speed" id="speed-normal" value="1" checked><span>Normal</span></label>
+        <label><input type="radio" name="speed" id="speed-fast" value="0.45"><span>Fast</span></label>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <section class="stage" id="stage" aria-label="Working">
+    <div class="stage-head">
+      <p class="stage-title" id="stage-title"></p>
+      <button type="button" class="ghost sm" id="stage-btn">Skip</button>
+    </div>
+    <div aria-hidden="true">
+      <p class="rowlabel" id="lab-a"></p>
+      <div class="tiles" id="tiles-a"></div>
+      <p class="rowlabel" id="lab-b"></p>
+      <div class="tiles" id="tiles-b"></div>
+      <p class="counter"><span id="c-label"></span><b id="c-val"></b></p>
+      <div class="legend" id="legend">
+  <div class="legend-item" data-letter="F"><div class="legend-letter">F</div><div class="legend-word">Friends</div></div>
+  <div class="legend-item" data-letter="L"><div class="legend-letter">L</div><div class="legend-word">Lovers</div></div>
+  <div class="legend-item" data-letter="A"><div class="legend-letter">A</div><div class="legend-word">Affection</div></div>
+  <div class="legend-item" data-letter="M"><div class="legend-letter">M</div><div class="legend-word">Marriage</div></div>
+  <div class="legend-item" data-letter="E"><div class="legend-letter">E</div><div class="legend-word">Enemies</div></div>
+  <div class="legend-item" data-letter="S"><div class="legend-letter">S</div><div class="legend-word">Siblings</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="result" id="result" aria-live="polite">
+    <div class="result-inner" id="result-inner">
+      <div class="hearts" id="hearts" aria-hidden="true"></div>
+      <p class="result-label" id="result-label">Your Result</p>
+      <p class="result-letter" id="result-letter">F</p>
+      <h2 class="result-title" id="result-title">Friends</h2>
+      <p class="result-desc" id="result-desc"></p>
+      <div class="result-chips" id="result-chips"></div>
+
+      <div class="share-row">
+        <button type="button" id="share-btn">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+          Share result
+        </button>
+      </div>
+      <div class="share-panel" id="share-panel" hidden>
+        <img id="share-img" alt="Your FLAMES result card" width="1080" height="1400">
+        <div class="share-actions" id="share-actions"></div>
+        <p class="share-msg" id="share-msg" role="status"></p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <nav class="legal" aria-label="Legal">
+    <a href="#terms" data-dialog="terms">Terms and Conditions</a>
+    <a href="#privacy" data-dialog="privacy">Privacy Policy</a>
+  </nav>
+  <div class="social">
+    <a class="btn ghost sm" href="https://github.com/saijishnup" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>GitHub</a>
+    <a class="btn tea sm" href="https://buymeatea.in/saijishnup" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8zM16 10h2a2.5 2.5 0 0 1 0 5h-2M8 2v3M12 2v3"/></svg>Buy Me a Coffee</a>
+  </div>
+</footer>
+
+<dialog id="terms" aria-labelledby="terms-h">
+  <div class="dlg-head"><h2 id="terms-h">Terms and Conditions</h2><button type="button" class="ghost sm" data-close>Close</button></div>
+  <div class="dlg-body">
+    <p class="dlg-date">Last updated: 17 October 2026</p>
+    <p>By using FLAMES Calculator you agree to these terms. If you do not agree, please do not use the site.</p>
+    <h3>For fun only</h3>
+    <p>FLAMES is a playground game. Results come from a letter-counting rule, not from anything real about the people named. Do not use a result to make decisions about a relationship.</p>
+    <h3>Using the site</h3>
+    <ul>
+      <li>Only enter names you are comfortable typing in, and be kind to the people you name.</li>
+      <li>Do not use results or share cards to tease, harass or embarrass anyone.</li>
+      <li>When you share a result, you are responsible for what you share and where.</li>
+    </ul>
+    <h3>Links to other sites</h3>
+    <p>Share buttons, GitHub and Buy Me a Tea open other websites. Their own terms and privacy policies apply there.</p>
+    <h3>No warranty</h3>
+    <p>The site is provided as is, without any warranty. It may change or go offline at any time. To the extent the law allows, the maker is not liable for any loss arising from its use.</p>
+    <h3>Changes</h3>
+    <p>These terms may be updated. The date above shows the latest version.</p>
+  </div>
+</dialog>
+
+<dialog id="privacy" aria-labelledby="privacy-h">
+  <div class="dlg-head"><h2 id="privacy-h">Privacy Policy</h2><button type="button" class="ghost sm" data-close>Close</button></div>
+  <div class="dlg-body">
+    <p class="dlg-date">Last updated: 17 October 2026</p>
+    <h3>What happens to the names you type</h3>
+    <p>The calculation runs entirely in your browser. Names are not sent to a server, saved, or logged by this site. Refreshing or closing the page clears them.</p>
+    <h3>No accounts, cookies or tracking</h3>
+    <p>The site has no sign-up, sets no cookies of its own, and uses no analytics or advertising trackers.</p>
+    <h3>Third parties</h3>
+    <ul>
+      <li>Fonts load from Google Fonts, which receives your IP address and browser details when the page loads.</li>
+      <li>The host serving this page may keep standard server logs.</li>
+      <li>If you use a share option, GitHub or Buy Me a Tea, the destination site receives what you send it and applies its own privacy policy.</li>
+    </ul>
+    <h3>Share images</h3>
+    <p>Result cards are drawn in your browser. They only leave your device if you save or share them yourself.</p>
+    <h3>Contact</h3>
+    <p>Questions about privacy can be raised through the GitHub link in the footer.</p>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  'use strict';
+
+  var WHEEL = ['F','L','A','M','E','S'];
+
+  var MEANINGS = {
+    F:{ title:'Friends',   desc:'Comfortable, easy, no drama. You laugh at the same things and text back at the same speed. The kind of bond that outlasts most romances.', chips:['Low pressure','Long haul','Good banter'] },
+    L:{ title:'Lovers',    desc:'The spark is loud and mutual. You finish each other\u2019s sentences, and everyone else has already noticed. Butterflies, allegedly.', chips:['High spark','Mutual','Obvious to others'] },
+    A:{ title:'Affection', desc:'Warm, caring, quietly devoted. One of you notices the small things \u2014 the saved seat, the shared umbrella, the last bite offered first.', chips:['Gentle','Attentive','Slow burn'] },
+    M:{ title:'Marriage',  desc:'The playground\u2019s highest honour. Everyone in the game treats this as the endgame, so enjoy the ceremony you did not actually plan.', chips:['Endgame','Rare pull','Tell your friends'] },
+    E:{ title:'Enemies',   desc:'Friction, but the interesting kind. You argue about everything and secretly enjoy it. Rivalry this specific takes real attention.', chips:['Sparks fly','Competitive','Weirdly close'] },
+    S:{ title:'Siblings',  desc:'Zero romance, maximum familiarity. You bicker like family because you basically are. Borrow their charger without asking.', chips:['Platonic','Familiar','Free snacks'] }
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+  var name1 = $('name1'), name2 = $('name2'),
+      err1 = $('err1'), err2 = $('err2'),
+      result = $('result'), resLetter = $('result-letter'), resTitle = $('result-title'),
+      resDesc = $('result-desc'), resChips = $('result-chips'), resLabel = $('result-label'),
+      legend = $('legend'), clearBtn = $('clear-btn'),
+      stage = $('stage'), stageTitle = $('stage-title'), stageBtn = $('stage-btn'),
+      resultInner = $('result-inner'), heartsBox = $('hearts'),
+      boxA = $('tiles-a'), boxB = $('tiles-b'), labA = $('lab-a'), labB = $('lab-b'),
+      cLabel = $('c-label'), cVal = $('c-val'),
+      shareBtn = $('share-btn'), sharePanel = $('share-panel'), shareImg = $('share-img'),
+      shareActs = $('share-actions'), shareMsg = $('share-msg');
+
+  var run = 0, running = false, last = null, tA = [], tB = [];
+  var reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- sound (synthesised, no files) ---------- */
+
+  var actx = null;
+  // Created/resumed inside a click, so browsers allow later sounds too.
+  function audio(){
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch (e) { actx = null; }
+    return actx;
+  }
+  function env(c, t, peak, dur){
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(c.destination);
+    return g;
+  }
+  function tone(c, type, f0, f1, t, dur, vol){
+    var o = c.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    o.connect(env(c, t, vol, dur));
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  var SFX = {
+    // two quick rising blips
+    bubble: function(c, t){ tone(c, 'sine', 300, 950, t, 0.13, 0.22); tone(c, 'sine', 460, 1350, t + 0.08, 0.11, 0.14); },
+    // filtered noise sweeping down and fading out
+    wind: function(c, t){
+      var d = 0.75, buf = c.createBuffer(1, Math.floor(c.sampleRate * d), c.sampleRate), ch = buf.getChannelData(0);
+      for (var i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+      var src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+      src.buffer = buf; f.type = 'bandpass'; f.Q.value = 0.7;
+      f.frequency.setValueAtTime(1800, t); f.frequency.exponentialRampToValueAtTime(250, t + d);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      src.connect(f); f.connect(g); g.connect(c.destination);
+      src.start(t); src.stop(t + d);
+    },
+    // short wooden tick for each step of the wheel spin
+    tick: function(c, t){ tone(c, 'triangle', 1500, 1100, t, 0.04, 0.06); },
+    // low drop when a letter is struck out
+    strike: function(c, t){ tone(c, 'sine', 420, 140, t, 0.16, 0.16); },
+    // soft major arpeggio with a high sparkle
+    chime: function(c, t){
+      [523.25, 659.25, 783.99].forEach(function(fr, i){ tone(c, 'triangle', fr, 0, t + i * 0.09, 1, 0.07); });
+      tone(c, 'sine', 1046.5, 0, t + 0.27, 1.3, 0.04);
+    }
+  };
+  // Mute choice is remembered per browser; storage may be unavailable, so guard it.
+  var muteBtn = $('mute-btn'), muted = false;
+  try { muted = localStorage.getItem('flames-muted') === '1'; } catch (e) {}
+  function paintMute(){
+    muteBtn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+    muteBtn.title = muted ? 'Unmute sounds' : 'Mute sounds';
+    muteBtn.setAttribute('aria-label', muteBtn.title);
+    muteBtn.querySelector('.ic-on').style.display = muted ? 'none' : '';
+    muteBtn.querySelector('.ic-off').style.display = muted ? '' : 'none';
+  }
+  muteBtn.addEventListener('click', function(){
+    muted = !muted;
+    try { localStorage.setItem('flames-muted', muted ? '1' : '0'); } catch (e) {}
+    paintMute();
+    if (!muted) sfx('bubble');
+  });
+  paintMute();
+
+  function sfx(name){
+    if (muted) return;
+    var c = audio();
+    if (c) try { SFX[name](c, c.currentTime + 0.01); } catch (e) {}
+  }
+
+  /* ---------- speed ---------- */
+
+  var speed = 1;
+  function setSpeed(v){
+    var input = document.querySelector('input[name=speed][value="' + v + '"]');
+    if (!input) return;
+    input.checked = true;
+    speed = parseFloat(v);
+  }
+  try { setSpeed(localStorage.getItem('flames-speed')); } catch (e) {}
+  document.querySelectorAll('input[name=speed]').forEach(function(i){
+    i.addEventListener('change', function(){
+      speed = parseFloat(i.value);
+      try { localStorage.setItem('flames-speed', i.value); } catch (e) {}
+    });
+  });
+
+  /* ---------- logic ---------- */
+
+  function normalize(raw){
+    return raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+  }
+
+  // Pairs of [indexInA, indexInB] cancelled against each other.
+  function matchPairs(a, b){
+    var used = [], pairs = [];
+    for (var i = 0; i < a.length; i++){
+      for (var j = 0; j < b.length; j++){
+        if (!used[j] && a[i] === b[j]){ used[j] = true; pairs.push([i, j]); break; }
+      }
+    }
+    return pairs;
+  }
+
+  // rounds[i] = letters visited while counting in round i; its last letter is struck.
+  function computeFlames(a, b){
+    var pairs = matchPairs(a, b);
+    var remaining = a.length + b.length - 2 * pairs.length;
+    var wheel = WHEEL.slice(), rounds = [];
+
+    // Identical letters: nothing left to count, classic game falls back to F.
+    if (remaining === 0){
+      return { pairs:pairs, remaining:0, strikes:[], rounds:rounds, winner:'F' };
+    }
+
+    var idx = 0;
+    while (wheel.length > 1){
+      var path = [];
+      for (var k = 0; k < remaining; k++) path.push(wheel[(idx + k) % wheel.length]);
+      idx = (idx + remaining - 1) % wheel.length;
+      rounds.push(path);
+      wheel.splice(idx, 1);
+    }
+    return { pairs:pairs, remaining:remaining, rounds:rounds, winner:wheel[0],
+             strikes:rounds.map(function(p){ return p[p.length - 1]; }) };
+  }
+
+  /* ---------- rendering ---------- */
+
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // The legend tiles double as the wheel (same F-L-A-M-E-S order).
+  var wheelEls = Array.prototype.slice.call(legend.children);
+
+  function setW(w, state){ w.className = 'legend-item' + (state ? ' ' + state : ''); }
+  function setTile(t, state){ t.className = 'tile ' + t.dataset.s + (state ? ' ' + state : ''); }
+  function setCounter(label, val){ cLabel.textContent = label; cVal.textContent = val; }
+
+  function buildTiles(box, str, side){
+    box.textContent = '';
+    return str.split('').map(function(c){
+      var t = el('span', null, c);
+      t.dataset.s = side;
+      setTile(t);
+      box.appendChild(t);
+      return t;
+    });
+  }
+
+  function reset(){
+    labA.textContent = last.rawA;
+    labB.textContent = last.rawB;
+    tA = buildTiles(boxA, last.a, 'a');
+    tB = buildTiles(boxB, last.b, 'b');
+    wheelEls.forEach(function(w){ setW(w); });
+    setCounter('Left over', 0);
+  }
+
+  var HEART_COLORS = ['#f0809a', '#ffb3c6', '#b9a3ff', '#d9ccff'];
+  function rand(lo, hi){ return lo + Math.random() * (hi - lo); }
+
+  // Translucent hearts drift down behind the result text, once per result.
+  function hearts(){
+    heartsBox.textContent = '';
+    if (reduceMotion) return;
+    var h = resultInner.offsetHeight + 60;
+    for (var i = 0; i < 16; i++){
+      var n = el('span', 'heart', '\u2665');
+      n.style.left = rand(2, 94) + '%';
+      n.style.fontSize = rand(14, 34) + 'px';
+      n.style.color = HEART_COLORS[i % HEART_COLORS.length];
+      n.style.setProperty('--d', rand(2.6, 4.4) + 's');
+      n.style.setProperty('--delay', rand(0, 1.4) + 's');
+      n.style.setProperty('--o', rand(0.25, 0.5).toFixed(2));
+      n.style.setProperty('--x', rand(-40, 40) + 'px');
+      n.style.setProperty('--r', rand(-50, 50) + 'deg');
+      n.style.setProperty('--h', h + 'px');
+      heartsBox.appendChild(n);
+    }
+  }
+
+  function renderResult(){
+    var out = last.out, meta = MEANINGS[out.winner];
+    resLetter.textContent = out.winner;
+    resTitle.textContent  = meta.title;
+    resDesc.textContent   = meta.desc;
+    resLabel.textContent  = last.rawA + '  +  ' + last.rawB;
+    resChips.textContent  = '';
+    meta.chips.forEach(function(c){ resChips.appendChild(el('span', 'chip', c)); });
+    prepareShare();
+    result.classList.remove('show');
+    void result.offsetWidth;
+    result.classList.add('show');
+    hearts();
+    sfx('chime');
+    result.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  // Jump every part of the stage to its end state, then reveal the result.
+  function finish(){
+    var out = last.out;
+    tA.concat(tB).forEach(function(t){ setTile(t, 'left'); });
+    out.pairs.forEach(function(p){ setTile(tA[p[0]], 'gone'); setTile(tB[p[1]], 'gone'); });
+    wheelEls.forEach(function(w){
+      var l = w.dataset.letter;
+      setW(w, l === out.winner ? 'hit' : (out.strikes.indexOf(l) !== -1 ? 'out' : ''));
+    });
+    setCounter('Left over', out.remaining);
+    stageTitle.textContent = 'Done';
+    stageBtn.textContent = 'Replay';
+    running = false;
+    renderResult();
+  }
+
+  /* ---------- animation ---------- */
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  // Resolves true if this run is still the current one after the delay.
+  function sleep(ms, t){
+    return new Promise(function(r){ setTimeout(function(){ r(t === run); }, ms * speed); });
+  }
+
+  async function animate(t){
+    var out = last.out, pairs = out.pairs, i, d;
+
+    // 1. cancel common letters
+    stageTitle.textContent = 'Step 1 of 3 \u00b7 Cancel common letters';
+    if (!await sleep(100, t)) return;
+    d = clamp(1400 / Math.max(pairs.length, 1), 40, 220);
+    for (i = 0; i < pairs.length; i++){
+      var ta = tA[pairs[i][0]], tb = tB[pairs[i][1]];
+      setTile(ta, 'pair'); setTile(tb, 'pair');
+      if (!await sleep(d, t)) return;
+      setTile(ta, 'gone'); setTile(tb, 'gone');
+      if (!await sleep(d / 3, t)) return;
+    }
+
+    // 2. count leftovers
+    stageTitle.textContent = 'Step 2 of 3 \u00b7 Count what is left';
+    var left = tA.concat(tB).filter(function(x){ return x.className.indexOf('gone') === -1; });
+    setCounter('Left over', 0);
+    d = clamp(900 / Math.max(left.length, 1), 16, 90);
+    for (i = 0; i < left.length; i++){
+      setTile(left[i], 'left');
+      setCounter('Left over', i + 1);
+      if (!await sleep(d, t)) return;
+    }
+    if (!await sleep(120, t)) return;
+
+    // 3. walk the wheel
+    stageTitle.textContent = 'Step 3 of 3 \u00b7 Walk the FLAMES wheel';
+    for (var r = 0; r < out.rounds.length; r++){
+      var path = out.rounds[r], prev = null, cur = null;
+      d = clamp(900 / path.length, 10, 80);
+      for (var k = 0; k < path.length; k++){
+        if (prev) setW(prev);
+        cur = wheelEls[WHEEL.indexOf(path[k])];
+        setW(cur, 'active');
+        sfx('tick');
+        setCounter('Counting', (k + 1) + ' / ' + path.length);
+        prev = cur;
+        if (!await sleep(d, t)) return;
+      }
+      setW(cur, 'out');
+      sfx('strike');
+      if (!await sleep(100, t)) return;
+    }
+    setW(wheelEls[WHEEL.indexOf(out.winner)], 'hit');
+    if (!await sleep(200, t)) return;
+    finish();
+  }
+
+  function start(){
+    var t = ++run;
+    running = true;
+    reset();
+    result.classList.remove('show');
+    stage.classList.remove('show');
+    void stage.offsetWidth;
+    stage.classList.add('show');
+    stageBtn.textContent = 'Skip';
+    if (reduceMotion){ finish(); return; }
+    stage.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    animate(t);
+  }
+
+  stageBtn.addEventListener('click', function(){
+    if (running){ run++; finish(); } else { sfx('bubble'); start(); }
+  });
+
+  /* ---------- share ---------- */
+
+  var shareP = null, shareUrl = null, msgTimer = 0;
+
+  function shareText(){
+    return last.rawA + ' + ' + last.rawB + ' = ' + last.out.winner + ' (' + MEANINGS[last.out.winner].title + ') on FLAMES Calculator';
+  }
+  function pageUrl(){ return /^https?:/.test(location.href) ? location.href.split('#')[0] : ''; }
+  function say(t){
+    shareMsg.textContent = t;
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(function(){ shareMsg.textContent = ''; }, 3000);
+  }
+
+  function rr(c, x, y, w, h, r){
+    c.beginPath(); c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  // Shrink a one-line string to fit; truncate with an ellipsis as a last resort.
+  function fit(c, text, font, size, min, maxW){
+    for (; size >= min; size -= 2){ c.font = font(size); if (c.measureText(text).width <= maxW) return text; }
+    c.font = font(min);
+    while (text.length > 1 && c.measureText(text + '\u2026').width > maxW) text = text.slice(0, -1);
+    return text + '\u2026';
+  }
+  function wrap(c, text, maxW){
+    var words = text.split(' '), lines = [], line = '';
+    words.forEach(function(w){
+      var t = line ? line + ' ' + w : w;
+      if (line && c.measureText(t).width > maxW){ lines.push(line); line = w; } else line = t;
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  // Draws the result card (1080x1400) and resolves a PNG blob.
+  async function makeCard(){
+    try {
+      await Promise.all([document.fonts.load('700 100px "Space Grotesk"'), document.fonts.load('400 30px "Space Grotesk"'), document.fonts.load('700 30px "Space Mono"')]);
+    } catch (e) {}
+    var W = 1080, H = 1400, cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    var c = cv.getContext('2d');
+    var INK = '#2b1b22', SOFT = '#6b5560';
+    var SANS = function(wt, sz){ return wt + ' ' + sz + 'px "Space Grotesk", system-ui, sans-serif'; };
+    var MONO = function(wt, sz){ return wt + ' ' + sz + 'px "Space Mono", ui-monospace, monospace'; };
+    var out = last.out, meta = MEANINGS[out.winner];
+
+    c.fillStyle = '#FFFDFC'; c.fillRect(0, 0, W, H);
+    [[0, 0, '252,231,239'], [W, 300, '229,241,255'], [W, H, '238,232,255'], [0, H, '252,231,239']].forEach(function(b){
+      var g = c.createRadialGradient(b[0], b[1], 0, b[0], b[1], 800);
+      g.addColorStop(0, 'rgba(' + b[2] + ',.95)'); g.addColorStop(1, 'rgba(' + b[2] + ',0)');
+      c.fillStyle = g; c.fillRect(0, 0, W, H);
+    });
+
+    var X = 90, Y = 160, CW = 900, CH = 1100, PX = X + 64, IW = CW - 128;
+    c.textBaseline = 'alphabetic';
+    c.font = SANS(700, 76); c.fillStyle = INK; c.fillText('FLAMES ', X, 108);
+    var fw = c.measureText('FLAMES ').width;
+    c.fillStyle = '#f0809a'; c.fillText('Calculator', X + fw, 108);
+    c.fillRect(X + fw, 120, c.measureText('Calculator').width, 6);
+
+    c.fillStyle = INK; rr(c, X + 14, Y + 14, CW, CH, 34); c.fill();
+    c.fillStyle = '#FCE7EF'; rr(c, X, Y, CW, CH, 34); c.fill();
+    c.lineWidth = 6; c.strokeStyle = INK; c.stroke();
+
+    c.fillStyle = SOFT;
+    if ('letterSpacing' in c) c.letterSpacing = '4px';
+    var names = fit(c, (last.rawA + '  +  ' + last.rawB).toUpperCase(), function(z){ return MONO(700, z); }, 34, 20, IW);
+    c.fillText(names, PX, Y + 110);
+    if ('letterSpacing' in c) c.letterSpacing = '0px';
+
+    c.fillStyle = INK; c.font = SANS(700, 400); c.fillText(out.winner, PX - 10, Y + 500);
+    c.font = SANS(700, 80); c.fillText(meta.title, PX, Y + 610);
+
+    c.font = SANS(400, 36); c.fillStyle = SOFT;
+    wrap(c, meta.desc, IW).slice(0, 6).forEach(function(l, i){ c.fillText(l, PX, Y + 690 + i * 52); });
+
+    c.font = MONO(700, 28);
+    var cx = PX, cy = Y + CH - 130;
+    meta.chips.forEach(function(t){
+      var w = c.measureText(t).width + 48;
+      c.fillStyle = INK; rr(c, cx + 5, cy + 5, w, 58, 29); c.fill();
+      c.fillStyle = '#ffffff'; rr(c, cx, cy, w, 58, 29); c.fill();
+      c.lineWidth = 4; c.strokeStyle = INK; c.stroke();
+      c.fillStyle = INK; c.fillText(t, cx + 24, cy + 38);
+      cx += w + 18;
+    });
+
+    return new Promise(function(res){ cv.toBlob(res, 'image/png'); });
+  }
+
+  // Start rendering as soon as a result exists, so the Share tap needs no waiting.
+  function prepareShare(){
+    sharePanel.hidden = true;
+    shareMsg.textContent = '';
+    if (shareUrl){ URL.revokeObjectURL(shareUrl); shareUrl = null; }
+    shareP = makeCard().catch(function(){ return null; });
+  }
+
+  function act(label, fn){
+    var b = el('button', 'ghost sm', label);
+    b.type = 'button';
+    b.addEventListener('click', fn);
+    shareActs.appendChild(b);
+  }
+  function link(label, href){
+    var a = el('a', 'btn ghost sm', label);
+    a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    shareActs.appendChild(a);
+  }
+
+  async function openPanel(blob, name){
+    var text = shareText(), url = pageUrl(), full = url ? text + ' ' + url : text;
+    var dl = null;
+    try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) {}
+    var inClaude = !!(window.claude && window.claude.use);
+
+    shareActs.textContent = '';
+    shareImg.hidden = !blob;
+    if (blob){
+      shareUrl = URL.createObjectURL(blob);
+      shareImg.src = shareUrl;
+
+      if (dl){
+        act('Save image', function(){
+          dl.save({ filename:name, data:blob }).then(function(){ say('Saved.'); }, function(e){
+            if (!e || e.code !== 'declined') say('Could not save the image.');
+          });
+        });
+      } else if (!inClaude){
+        var a = el('a', 'btn ghost sm', 'Save image');
+        a.href = shareUrl; a.download = name;
+        shareActs.appendChild(a);
+      }
+      if (navigator.clipboard && window.ClipboardItem){
+        act('Copy image', function(){
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(
+            function(){ say('Image copied.'); }, function(){ say('Copy is blocked here. Use Save image.'); });
+        });
+      }
+    }
+    if (navigator.share){
+      act('Share\u2026', function(){
+        var d = { title:'FLAMES Calculator', text:text }; if (url) d.url = url;
+        navigator.share(d).catch(function(e){ if (!e || e.name !== 'AbortError') say('Sharing is blocked here.'); });
+      });
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      act('Copy text', function(){
+        navigator.clipboard.writeText(full).then(function(){ say('Text copied.'); }, function(){ say('Copy is blocked here.'); });
+      });
+    }
+    var q = encodeURIComponent(full);
+    link('WhatsApp', 'https://wa.me/?text=' + q);
+    link('Telegram', 'https://t.me/share/url?url=' + encodeURIComponent(url || ' ') + '&text=' + encodeURIComponent(text));
+    link('X', 'https://twitter.com/intent/tweet?text=' + q);
+
+    var touch = matchMedia('(pointer: coarse)').matches;
+    say(blob && touch ? 'Press and hold the image to save it.' : '');
+    sharePanel.hidden = false;
+    sharePanel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+
+  shareBtn.addEventListener('click', async function(){
+    if (!sharePanel.hidden){ sharePanel.hidden = true; return; }
+    var blob = await shareP;
+    var name = 'flames-' + last.a.slice(0, 12) + '-' + last.b.slice(0, 12) + '.png';
+    if (blob && navigator.canShare && navigator.share){
+      var d = { files:[new File([blob], name, { type:'image/png' })], title:'FLAMES Calculator', text:shareText() };
+      if (pageUrl()) d.url = pageUrl();
+      try {
+        if (navigator.canShare(d)){ await navigator.share(d); return; }
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;
+      }
+    }
+    openPanel(blob, name);
+  });
+
+  /* ---------- policy dialogs ---------- */
+
+  document.querySelectorAll('[data-dialog]').forEach(function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); $(a.dataset.dialog).showModal(); });
+  });
+  document.querySelectorAll('dialog').forEach(function(d){
+    d.querySelector('[data-close]').addEventListener('click', function(){ d.close(); });
+    // Click on the backdrop (the dialog box itself, outside its content) closes it.
+    d.addEventListener('click', function(e){ if (e.target === d) d.close(); });
+  });
+
+  /* ---------- reactive background ---------- */
+  // Soft pastel liquid: blobs drift on their own and get dragged by the pointer over
+  // the open background, then ease back to their places.
+  // Canvas 2D at half resolution; the blobs are soft so the upscale is invisible.
+
+  var fluid = $('fluid'), fx = fluid.getContext('2d'), SCALE = 0.5, W = 0, H = 0;
+  var TINTS = ['255,179,198', '186,214,255', '217,204,255', '201,232,216', '255,196,214', '196,222,255'];
+  var HOMES = [[.12,.15], [.88,.18], [.82,.84], [.5,.46], [.22,.78], [.68,.32]];
+  var blobs = TINTS.map(function(c, i){
+    return { c:c, hx:HOMES[i][0], hy:HOMES[i][1], x:0, y:0, vx:0, vy:0, ph:i * 1.7, r:0.3 + (i % 3) * 0.06 };
+  });
+  var px = null, py = null, lastFrame = 0;
+
+  function sizeFluid(){
+    W = fluid.width = Math.ceil(innerWidth * SCALE);
+    H = fluid.height = Math.ceil(innerHeight * SCALE);
+    blobs.forEach(function(b){ b.x = b.hx * W; b.y = b.hy * H; });
+  }
+
+  // Each blob stretches along its direction of travel, which reads as liquid.
+  function blob(x, y, vx, vy, r, c, a){
+    var sp = Math.min(Math.hypot(vx, vy) * 0.05, 0.7), g;
+    fx.save();
+    fx.translate(x, y);
+    fx.rotate(Math.atan2(vy, vx));
+    fx.scale(1 + sp, 1 / (1 + sp * 0.6));
+    g = fx.createRadialGradient(0, 0, 0, 0, 0, r);
+    g.addColorStop(0, 'rgba(' + c + ',' + a + ')');
+    g.addColorStop(0.5, 'rgba(' + c + ',' + (a * 0.45) + ')');
+    g.addColorStop(1, 'rgba(' + c + ',0)');
+    fx.fillStyle = g;
+    fx.fillRect(-r, -r, r * 2, r * 2);
+    fx.restore();
+  }
+
+  function frame(now){
+    var dt = lastFrame ? Math.min(now - lastFrame, 40) / 16.7 : 1, t = now * 0.001, M = Math.max(W, H);
+    lastFrame = now;
+    fx.clearRect(0, 0, W, H);
+    blobs.forEach(function(b, i){
+      var tx = (b.hx + Math.sin(t * (0.21 + i * 0.03) + b.ph) * 0.09) * W;
+      var ty = (b.hy + Math.cos(t * (0.17 + i * 0.025) + b.ph) * 0.08) * H;
+      b.vx = (b.vx + (tx - b.x) * 0.0025 * dt) * Math.pow(0.955, dt);
+      b.vy = (b.vy + (ty - b.y) * 0.0025 * dt) * Math.pow(0.955, dt);
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      blob(b.x, b.y, b.vx, b.vy, b.r * M, b.c, 0.72);
+    });
+    requestAnimationFrame(frame);
+  }
+
+  // Only the open background reacts: cards, header text, footer items and dialogs do not.
+  function onBackground(e){ return !e.target.closest('header > *, main, footer > *, dialog'); }
+
+  document.addEventListener('pointermove', function(e){
+    var x = e.clientX * SCALE, y = e.clientY * SCALE;
+    if (px !== null && onBackground(e) && !reduceMotion){
+      var dx = x - px, dy = y - py, R = Math.max(W, H) * 0.35;
+      blobs.forEach(function(b){
+        var f = 1 - Math.hypot(b.x - x, b.y - y) / R;
+        if (f > 0){ b.vx += dx * f * 0.25; b.vy += dy * f * 0.25; }
+      });
+    }
+    px = x; py = y;
+  });
+
+  addEventListener('resize', sizeFluid);
+  sizeFluid();
+  if (reduceMotion){
+    blobs.forEach(function(b){ blob(b.x, b.y, 0, 0, b.r * Math.max(W, H), b.c, 0.72); });
+    addEventListener('resize', function(){ blobs.forEach(function(b){ blob(b.x, b.y, 0, 0, b.r * Math.max(W, H), b.c, 0.72); }); });
+  } else {
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- form ---------- */
+
+  function showError(input, node, show){
+    input.classList.toggle('err', show);
+    node.classList.toggle('show', show);
+    input.setAttribute('aria-invalid', show ? 'true' : 'false');
+  }
+
+  function hideOutput(){
+    run++;
+    running = false;
+    stage.classList.remove('show');
+    result.classList.remove('show');
+    wheelEls.forEach(function(w){ setW(w); });
+  }
+
+  // Plain click/Enter, not <form> submit: sandboxed viewers can block submission.
+  function calculate(){
+    sfx('bubble');
+    var rawA = name1.value.trim();
+    var rawB = name2.value.trim();
+    var a = normalize(rawA);
+    var b = normalize(rawB);
+
+    var badA = a.length === 0;
+    var badB = b.length === 0;
+
+    showError(name1, err1, badA);
+    showError(name2, err2, badB);
+
+    if (badA || badB){
+      hideOutput();
+      (badA ? name1 : name2).focus();
+      return;
+    }
+
+    last = { rawA:rawA, rawB:rawB, a:a, b:b, out:computeFlames(a, b) };
+    start();
+  }
+
+  $('calc-btn').addEventListener('click', calculate);
+  [[name1, err1], [name2, err2]].forEach(function(f){
+    f[0].addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); calculate(); } });
+    f[0].addEventListener('input', function(){ if (normalize(f[0].value)) showError(f[0], f[1], false); });
+  });
+
+  clearBtn.addEventListener('click', function(){
+    sfx('wind');
+    name1.value = name2.value = '';
+    showError(name1, err1, false);
+    showError(name2, err2, false);
+    hideOutput();
+    name1.focus();
+  });
+
+  (function selfTest(){
+    function check(a, b, expected){
+      var r = computeFlames(a, b);
+      if (r.winner !== expected){
+        console.error('FLAMES self-test failed:', a, b, 'got', r.winner, 'expected', expected);
+      }
+    }
+    check('sachin','priya','E');
+    check('abc','def','M');
+    check('love','hate','M');
+    check('riya','riya','F');
+    check('a','b','E');
+  })();
+
+})();
+</script>
+</html>
