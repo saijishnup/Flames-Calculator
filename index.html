@@ -693,7 +693,7 @@
     result.classList.add('show');
     hearts();
     sfx('chime');
-    result.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    result.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block:'nearest' });
   }
 
   // Jump every part of the stage to its end state, then reveal the result.
@@ -779,8 +779,7 @@
     void stage.offsetWidth;
     stage.classList.add('show');
     stageBtn.textContent = 'Skip';
-    if (reduceMotion){ finish(); return; }
-    stage.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    stage.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block:'nearest' });
     animate(t);
   }
 
