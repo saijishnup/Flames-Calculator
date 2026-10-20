@@ -305,6 +305,7 @@
       animation-duration:.01ms !important;
       transition-duration:.01ms !important;
     }
+    .heart{animation-duration:var(--d) !important}
   }
 </style>
 
@@ -662,7 +663,6 @@
   // Translucent hearts drift down behind the result text, once per result.
   function hearts(){
     heartsBox.textContent = '';
-    if (reduceMotion) return;
     var h = resultInner.offsetHeight + 60;
     for (var i = 0; i < 16; i++){
       var n = el('span', 'heart', '\u2665');
